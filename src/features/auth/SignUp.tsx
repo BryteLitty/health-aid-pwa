@@ -231,8 +231,8 @@ export default function SignUpForm() {
             onClick={handleGoogleSignUp}
             disabled={isLoading}
           >
-            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-            <span>Sign up with Google</span>
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 text-black" />
+            <span className="text-black">Sign up with Google</span>
           </button>
         </form>
       </Form>

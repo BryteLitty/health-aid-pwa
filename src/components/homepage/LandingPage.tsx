@@ -40,12 +40,12 @@ export default function LandingPage() {
       {/* Navigation dots and button */}
       <div className="w-full flex items-center justify-between px-8 pb-8 z-10">
         <div className="flex gap-1">
-          <div className="h-1.5 w-6 rounded-full bg-primary"></div>
-          <div className="h-1.5 w-3 rounded-full bg-primary/20"></div>
+          <div className="h-1.5 w-6 rounded-full bg-[#407CE2]"></div>
+          <div className="h-1.5 w-3 rounded-full bg-[#407CE2]/20"></div>
         </div>
         <Link
           to="/onboarding"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-[#407CE2] text-white shadow-lg hover:bg-blue-700"
         >
           <ArrowRight className="h-6 w-6" />
         </Link>

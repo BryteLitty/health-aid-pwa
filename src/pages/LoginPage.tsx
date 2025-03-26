@@ -21,8 +21,8 @@ const LoginPage = () => {
       <div className="flex flex-col items-center justify-center">
         <div className="w-full px-4 pt-4 flex flex-col items-center justify-center">
           <img src={Logo} alt="Logo" className="w-1/8" />
-          <h1 className="">Health Aid Plus</h1>
-          <h2 className="text-2xl font-bold mt-12">Sign In</h2>
+          <h1 className="text-black">Health Aid Plus</h1>
+          <h2 className="text-black text-2xl font-bold mt-12">Sign In</h2>
         </div>
         <Login />
       </div>

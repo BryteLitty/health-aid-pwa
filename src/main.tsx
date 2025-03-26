@@ -12,13 +12,14 @@ import AddAppointmentPage from './pages/AddAppointmentPage'
 import { Toaster } from 'sonner'
 import { AuthProvider } from './context/AuthContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import Homescreen from './pages/Homescreen'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<OnboardingPage />} />
+          <Route path="/" element={<Homescreen />} />
           <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignUpPage />} />

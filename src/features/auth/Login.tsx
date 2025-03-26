@@ -165,8 +165,8 @@ export default function Login() {
             onClick={handleGoogleSignIn}
             disabled={isLoading}
           >
-            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-            <span>Sign in with Google</span>
+            <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5 text-black" />
+            <span className="text-black">Sign in with Google</span>
           </button>
         </form>
       </Form>

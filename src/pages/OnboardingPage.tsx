@@ -24,11 +24,11 @@ const OnboardingPage = () => {
 
         {/* buttons */}
         <div className="flex flex-col gap-6 w-full items-center justify-center pb-10">
-            <button onClick={() => navigate("/login")} className="bg-primary border-1 cursor-pointer border-primary text-white w-2/3 py-4 rounded-full">
+            <button onClick={() => navigate("/login")} className="bg-[#407CE2] border-1 cursor-pointer border-[#407CE2] text-white w-2/3 py-4 rounded-full">
                 <p>Login</p>
             </button>
 
-            <button onClick={() => navigate("/signup")} className="bg-white border-1 cursor-pointer border-primary text-primary w-2/3 py-4 rounded-full">
+            <button onClick={() => navigate("/signup")} className="bg-white border-1 cursor-pointer border-[#407CE2] text-[#407CE2] w-2/3 py-4 rounded-full">
                 <p>Sign Up</p>
             </button>
         </div>
