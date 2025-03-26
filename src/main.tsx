@@ -18,14 +18,7 @@ import AppointmentDetailsPage from './pages/AppointmentDetailsPage'
 import MedicationDetailsPage from './pages/MedicationDetailsPage'
 import SchedulePage from './pages/SchedulePage'
 import HealthPage from './pages/HealthPage'
-
-// Create an AccountPage component as a temporary placeholder
-const AccountPage = () => (
-  <div className="container max-w-xl mx-auto px-4 pb-20 min-h-screen">
-    <h1 className="text-2xl font-bold py-4">Account</h1>
-    <p>Account settings will be available soon.</p>
-  </div>
-);
+import AccountPage from "./pages/AccountPage"
 
 // Create a NotFoundPage component
 const NotFoundPage = () => (
