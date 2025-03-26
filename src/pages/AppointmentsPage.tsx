@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import ConfirmationDialog from "@/components/ConfirmationDialog"
 
 // Define type for appointment
 interface Appointment {
@@ -68,6 +69,8 @@ export default function AppointmentsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
+  const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -127,23 +130,36 @@ export default function AppointmentsPage() {
     navigate(`/edit-appointment/${id}`)
   }
 
-  const handleDeleteAppointment = async (id: string) => {
-    if (!confirm("Are you sure you want to cancel this appointment?")) return
+  const handleCancelClick = (id: string) => {
+    setAppointmentToCancel(id)
+    setShowCancelDialog(true)
+  }
+
+  const handleCloseCancelDialog = () => {
+    setShowCancelDialog(false)
+    setAppointmentToCancel(null)
+  }
+
+  const handleConfirmCancel = async () => {
+    if (!appointmentToCancel) return
 
     try {
       const { error } = await supabase
         .from("appointments")
         .delete()
-        .eq("id", id)
+        .eq("id", appointmentToCancel)
 
       if (error) throw error
 
       // Update local state
-      setAppointments(appointments.filter(appt => appt.id !== id))
+      setAppointments(appointments.filter(appt => appt.id !== appointmentToCancel))
       toast.success("Appointment cancelled successfully")
     } catch (error) {
       console.error("Error deleting appointment:", error)
       toast.error("Failed to cancel appointment")
+    } finally {
+      setShowCancelDialog(false)
+      setAppointmentToCancel(null)
     }
   }
 
@@ -325,7 +341,7 @@ export default function AppointmentsPage() {
                               {appointment.status !== "cancelled" && (
                                 <DropdownMenuItem
                                   className="text-destructive"
-                                  onClick={() => handleDeleteAppointment(appointment.id)}
+                                  onClick={() => handleCancelClick(appointment.id)}
                                 >
                                   Cancel
                                 </DropdownMenuItem>
@@ -362,6 +378,17 @@ export default function AppointmentsPage() {
       )}
 
       <BottomNav />
+
+      <ConfirmationDialog
+        isOpen={showCancelDialog}
+        onClose={handleCloseCancelDialog}
+        onConfirm={handleConfirmCancel}
+        title="Cancel Appointment"
+        description="Are you sure you want to cancel this appointment? This action cannot be undone."
+        confirmLabel="Cancel Appointment"
+        cancelLabel="Keep Appointment"
+        confirmVariant="destructive"
+      />
     </div>
   )
 } 

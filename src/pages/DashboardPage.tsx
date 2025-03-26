@@ -16,6 +16,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Skeleton } from "@/components/ui/skeleton"
+import ConfirmationDialog from "@/components/ConfirmationDialog"
 
 // Define types
 interface Medication {
@@ -48,6 +49,13 @@ const DashboardPage = () => {
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [isLoadingMeds, setIsLoadingMeds] = useState(true)
   const [isLoadingAppts, setIsLoadingAppts] = useState(true)
+  
+  // State for confirmation dialogs
+  const [showDeleteMedDialog, setShowDeleteMedDialog] = useState(false)
+  const [medicationToDelete, setMedicationToDelete] = useState<string | null>(null)
+  const [showCancelApptDialog, setShowCancelApptDialog] = useState(false)
+  const [appointmentToCancel, setAppointmentToCancel] = useState<string | null>(null)
+  
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -129,23 +137,36 @@ const DashboardPage = () => {
     navigate(`/appointment-details/${id}`);
   };
 
-  const handleDeleteAppointment = async (id: string) => {
-    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+  const handleCancelAppointmentClick = (id: string) => {
+    setAppointmentToCancel(id);
+    setShowCancelApptDialog(true);
+  };
+  
+  const handleCloseCancelDialog = () => {
+    setShowCancelApptDialog(false);
+    setAppointmentToCancel(null);
+  };
+  
+  const handleConfirmCancelAppointment = async () => {
+    if (!appointmentToCancel) return;
     
     try {
       const { error } = await supabase
         .from("appointments")
         .delete()
-        .eq("id", id);
+        .eq("id", appointmentToCancel);
       
       if (error) throw error;
       
       // Update local state
-      setAppointments(appointments.filter(appt => appt.id !== id));
+      setAppointments(appointments.filter(appt => appt.id !== appointmentToCancel));
       toast.success("Appointment cancelled successfully");
     } catch (error) {
       console.error("Error deleting appointment:", error);
       toast.error("Failed to cancel appointment");
+    } finally {
+      setShowCancelApptDialog(false);
+      setAppointmentToCancel(null);
     }
   };
 
@@ -157,23 +178,36 @@ const DashboardPage = () => {
     navigate(`/medication-details/${id}`);
   };
 
-  const handleDeleteMedication = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this medication?")) return;
+  const handleDeleteMedicationClick = (id: string) => {
+    setMedicationToDelete(id);
+    setShowDeleteMedDialog(true);
+  };
+  
+  const handleCloseDeleteDialog = () => {
+    setShowDeleteMedDialog(false);
+    setMedicationToDelete(null);
+  };
+  
+  const handleConfirmDeleteMedication = async () => {
+    if (!medicationToDelete) return;
     
     try {
       const { error } = await supabase
         .from("medications")
         .delete()
-        .eq("id", id);
+        .eq("id", medicationToDelete);
       
       if (error) throw error;
       
       // Update local state
-      setMedications(medications.filter(med => med.id !== id));
+      setMedications(medications.filter(med => med.id !== medicationToDelete));
       toast.success("Medication deleted successfully");
     } catch (error) {
       console.error("Error deleting medication:", error);
       toast.error("Failed to delete medication");
+    } finally {
+      setShowDeleteMedDialog(false);
+      setMedicationToDelete(null);
     }
   };
 
@@ -282,7 +316,7 @@ const DashboardPage = () => {
                           className="text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteMedication(med.id);
+                            handleDeleteMedicationClick(med.id);
                           }}
                         >
                           Delete
@@ -392,7 +426,7 @@ const DashboardPage = () => {
                           className="text-destructive"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteAppointment(appt.id);
+                            handleCancelAppointmentClick(appt.id);
                           }}
                         >
                           Cancel
@@ -480,6 +514,22 @@ const DashboardPage = () => {
       />
 
       <BottomNav />
+
+      <ConfirmationDialog
+        isOpen={showCancelApptDialog}
+        onClose={handleCloseCancelDialog}
+        onConfirm={handleConfirmCancelAppointment}
+        title="Confirm Appointment Cancellation"
+        description="Are you sure you want to cancel this appointment?"
+      />
+
+      <ConfirmationDialog
+        isOpen={showDeleteMedDialog}
+        onClose={handleCloseDeleteDialog}
+        onConfirm={handleConfirmDeleteMedication}
+        title="Confirm Medication Deletion"
+        description="Are you sure you want to delete this medication?"
+      />
     </div>
   )
 }

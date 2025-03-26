@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import BottomNav from "@/components/BottomNav"
+import ConfirmationDialog from "@/components/ConfirmationDialog"
 
 // Define type for medication
 interface Medication {
@@ -33,6 +34,8 @@ export default function MedicationsPage() {
   const [filteredMedications, setFilteredMedications] = useState<Medication[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [medicationToDelete, setMedicationToDelete] = useState<string | null>(null)
   const navigate = useNavigate()
   const { user } = useAuth()
 
@@ -85,23 +88,36 @@ export default function MedicationsPage() {
     navigate(`/edit-medication/${id}`)
   }
 
-  const handleDeleteMedication = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this medication?")) return
+  const handleDeleteClick = (id: string) => {
+    setMedicationToDelete(id)
+    setShowDeleteDialog(true)
+  }
+
+  const handleCancelDelete = () => {
+    setShowDeleteDialog(false)
+    setMedicationToDelete(null)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!medicationToDelete) return
 
     try {
       const { error } = await supabase
         .from("medications")
         .delete()
-        .eq("id", id)
+        .eq("id", medicationToDelete)
 
       if (error) throw error
 
       // Update local state
-      setMedications(medications.filter(med => med.id !== id))
+      setMedications(medications.filter(med => med.id !== medicationToDelete))
       toast.success("Medication deleted successfully")
     } catch (error) {
       console.error("Error deleting medication:", error)
       toast.error("Failed to delete medication")
+    } finally {
+      setShowDeleteDialog(false)
+      setMedicationToDelete(null)
     }
   }
 
@@ -229,7 +245,7 @@ export default function MedicationsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem 
                         className="text-destructive"
-                        onClick={() => handleDeleteMedication(medication.id)}
+                        onClick={() => handleDeleteClick(medication.id)}
                       >
                         Delete
                       </DropdownMenuItem>
@@ -264,6 +280,17 @@ export default function MedicationsPage() {
       )}
 
       <BottomNav />
+
+      <ConfirmationDialog
+        isOpen={showDeleteDialog}
+        onClose={handleCancelDelete}
+        onConfirm={handleConfirmDelete}
+        title="Delete Medication"
+        description={`Are you sure you want to delete this medication? This action cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        confirmVariant="destructive"
+      />
     </div>
   )
 } 
