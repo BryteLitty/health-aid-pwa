@@ -1,14 +1,181 @@
-import { Bell, Calendar, Phone, Pill, Plus, AlertCircle } from "lucide-react"
+import { Bell, Calendar, Phone, Pill, Plus, AlertCircle, MoreVertical } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import BottomNav from "@/components/BottomNav"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import ActionMenu from "@/components/ActionMenu"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@/context/AuthContext"
+import supabase from "@/supabase/supabase"
+import { toast } from "sonner"
+import { format } from "date-fns"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton"
+
+// Define types
+interface Medication {
+  id: string
+  name: string
+  dosage: string
+  frequency: string
+  time: string
+  notes?: string
+  user_id: string
+  created_at: string
+}
+
+interface Appointment {
+  id: string
+  doctor_name: string
+  type: string
+  purpose: string
+  date: string
+  time: string
+  notes?: string
+  status: string
+  user_id: string
+  created_at: string
+}
 
 const DashboardPage = () => {
   const [showActionMenu, setShowActionMenu] = useState(false)
+  const [medications, setMedications] = useState<Medication[]>([])
+  const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [isLoadingMeds, setIsLoadingMeds] = useState(true)
+  const [isLoadingAppts, setIsLoadingAppts] = useState(true)
   const navigate = useNavigate()
+  const { user } = useAuth()
+
+  // Format today's date
+  const today = new Date();
+  const formattedDate = format(today, "EEEE, MMMM d");
+
+  // Fetch medications from Supabase
+  useEffect(() => {
+    const fetchMedications = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoadingMeds(true);
+        const { data, error } = await supabase
+          .from("medications")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+        
+        if (error) throw error;
+        setMedications(data || []);
+      } catch (error) {
+        console.error("Error fetching medications:", error);
+        toast.error("Failed to load medications");
+      } finally {
+        setIsLoadingMeds(false);
+      }
+    };
+
+    fetchMedications();
+  }, [user]);
+
+  // Fetch appointments from Supabase
+  useEffect(() => {
+    const fetchAppointments = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoadingAppts(true);
+        const { data, error } = await supabase
+          .from("appointments")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("date", { ascending: true });
+        
+        if (error) throw error;
+        setAppointments(data || []);
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+        toast.error("Failed to load appointments");
+      } finally {
+        setIsLoadingAppts(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [user]);
+
+  // Get today's upcoming items
+  const todaysMedications = medications.filter(med => {
+    // In a real app, you might want to filter by scheduled time for today
+    // This is a simplified version
+    return true;
+  }).slice(0, 3);
+
+  const upcomingAppointments = appointments
+    .filter(appt => {
+      // Only show appointments that are today or in the future
+      return new Date(appt.date) >= new Date(new Date().setHours(0,0,0,0));
+    })
+    .slice(0, 3);
+
+  const handleEditAppointment = (id: string) => {
+    navigate(`/edit-appointment/${id}`);
+  };
+
+  const handleViewAppointmentDetails = (id: string) => {
+    navigate(`/appointment-details/${id}`);
+  };
+
+  const handleDeleteAppointment = async (id: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from("appointments")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setAppointments(appointments.filter(appt => appt.id !== id));
+      toast.success("Appointment cancelled successfully");
+    } catch (error) {
+      console.error("Error deleting appointment:", error);
+      toast.error("Failed to cancel appointment");
+    }
+  };
+
+  const handleEditMedication = (id: string) => {
+    navigate(`/edit-medication/${id}`);
+  };
+
+  const handleViewMedicationDetails = (id: string) => {
+    navigate(`/medication-details/${id}`);
+  };
+
+  const handleDeleteMedication = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this medication?")) return;
+    
+    try {
+      const { error } = await supabase
+        .from("medications")
+        .delete()
+        .eq("id", id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setMedications(medications.filter(med => med.id !== id));
+      toast.success("Medication deleted successfully");
+    } catch (error) {
+      console.error("Error deleting medication:", error);
+      toast.error("Failed to delete medication");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -16,8 +183,8 @@ const DashboardPage = () => {
       <header className="bg-white p-4 sticky top-0 shadow-sm z-10">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">Welcome, John</h1>
-            <p className="text-sm text-gray-500">Monday, March 25</p>
+            <h1 className="text-xl font-bold">Welcome, {user?.user_metadata?.name || 'User'}</h1>
+            <p className="text-sm text-gray-500">{formattedDate}</p>
           </div>
           <Button variant="ghost" size="icon" className="relative">
             <Bell className="h-6 w-6" />
@@ -45,33 +212,218 @@ const DashboardPage = () => {
 
       {/* Today's Reminders */}
       <section className="p-4">
-        <h2 className="text-lg font-semibold mb-3">Today's Reminders</h2>
-        <div className="space-y-3">
-          <Card className="p-3 bg-white">
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mr-3">
-                <Pill className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h3 className="font-medium">Take Medication</h3>
-                <p className="text-sm text-gray-500">Amoxicillin - 2 pills</p>
-              </div>
-              <p className="ml-auto text-sm text-gray-500">9:00 AM</p>
-            </div>
-          </Card>
-          <Card className="p-3 bg-white">
-            <div className="flex items-center">
-              <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
-                <Calendar className="h-5 w-5 text-green-600" />
-              </div>
-              <div>
-                <h3 className="font-medium">Doctor Appointment</h3>
-                <p className="text-sm text-gray-500">Dr. Smith - Checkup</p>
-              </div>
-              <p className="ml-auto text-sm text-gray-500">2:30 PM</p>
-            </div>
-          </Card>
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">Medications</h2>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-sm text-primary"
+            onClick={() => navigate('/medications')}
+          >
+            View all
+          </Button>
         </div>
+        
+        {isLoadingMeds ? (
+          // Loading state
+          <div className="space-y-3">
+            {[1, 2].map(i => (
+              <Card key={i} className="p-3 bg-white">
+                <div className="flex items-center">
+                  <Skeleton className="h-10 w-10 rounded-full mr-3" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-40 mb-1" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <Skeleton className="h-4 w-12 ml-2" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : todaysMedications.length > 0 ? (
+          <div className="space-y-3">
+            {/* Medications */}
+            {todaysMedications.map(med => (
+              <Card 
+                key={med.id} 
+                className="p-3 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => handleViewMedicationDetails(med.id)}
+              >
+                <div className="flex items-center">
+                  <div className="h-10 w-10 bg-primary/10 rounded-full flex items-center justify-center mr-3">
+                    <Pill className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium">Take Medication</h3>
+                    <p className="text-sm text-gray-500">{med.name} - {med.dosage}</p>
+                  </div>
+                  <div className="flex items-center">
+                    <p className="text-sm text-gray-500 mr-2">{med.time}</p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewMedicationDetails(med.id);
+                        }}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditMedication(med.id);
+                        }}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteMedication(med.id);
+                          }}
+                        >
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-6 bg-white text-center">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Pill className="h-8 w-8 text-muted-foreground" />
+              <h3 className="font-medium">No medications for today</h3>
+              <p className="text-sm text-gray-500">
+                Add medications to see them here
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate("/add-medication")}
+                className="mt-2"
+              >
+                <Pill className="h-4 w-4 mr-1" />
+                Add Medication
+              </Button>
+            </div>
+          </Card>
+        )}
+      </section>
+
+      {/* Appointments */}
+      <section className="p-4">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="text-lg font-semibold">Appointments</h2>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="text-sm text-primary"
+            onClick={() => navigate('/appointments')}
+          >
+            View all
+          </Button>
+        </div>
+        
+        {isLoadingAppts ? (
+          // Loading state
+          <div className="space-y-3">
+            {[1, 2].map(i => (
+              <Card key={i} className="p-3 bg-white">
+                <div className="flex items-center">
+                  <Skeleton className="h-10 w-10 rounded-full mr-3" />
+                  <div className="flex-1">
+                    <Skeleton className="h-5 w-40 mb-1" />
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                  <Skeleton className="h-4 w-12 ml-2" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : upcomingAppointments.length > 0 ? (
+          <div className="space-y-3">
+            {upcomingAppointments.map(appt => (
+              <Card 
+                key={appt.id} 
+                className="p-3 bg-white hover:bg-gray-50 cursor-pointer transition-colors"
+                onClick={() => handleViewAppointmentDetails(appt.id)}
+              >
+                <div className="flex items-center">
+                  <div className="h-10 w-10 bg-green-100 rounded-full flex items-center justify-center mr-3">
+                    <Calendar className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-medium">Doctor Appointment</h3>
+                    <p className="text-sm text-gray-500">
+                      {appt.doctor_name} - {appt.type}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {format(new Date(appt.date), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                  <div className="flex items-center">
+                    <p className="text-sm text-gray-500 mr-2">{appt.time}</p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewAppointmentDetails(appt.id);
+                        }}>
+                          View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditAppointment(appt.id);
+                        }}>
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteAppointment(appt.id);
+                          }}
+                        >
+                          Cancel
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="p-6 bg-white text-center">
+            <div className="flex flex-col items-center justify-center gap-2">
+              <Calendar className="h-8 w-8 text-muted-foreground" />
+              <h3 className="font-medium">No upcoming appointments</h3>
+              <p className="text-sm text-gray-500">
+                Book an appointment to see it here
+              </p>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => navigate("/add-appointment")}
+                className="mt-2"
+              >
+                <Calendar className="h-4 w-4 mr-1" />
+                Book Appointment
+              </Button>
+            </div>
+          </Card>
+        )}
       </section>
 
       {/* Quick Access Grid */}
@@ -96,19 +448,19 @@ const DashboardPage = () => {
           </Button>
           <Button 
             variant="outline"
-            className="h-24 flex flex-col items-center justify-center space-y-2 bg-white"
-            onClick={() => console.log("Contact Doctor")}
+            className="h-24 flex flex-col items-center justify-center gap-2 bg-white hover:bg-primary/5 border-primary/20"
+            onClick={() => navigate("/medications")}
           >
-            <Phone className="h-6 w-6 text-[#407CE2]" />
-            <span>Contact Doctor</span>
+            <Pill className="h-6 w-6 text-[#407CE2]" />
+            <span className="text-sm font-medium text-[#407CE2]">Manage Medications</span>
           </Button>
           <Button 
-            variant="destructive"
-            className="h-24 flex flex-col items-center justify-center space-y-2"
-            onClick={() => console.log("SOS")}
+            variant="outline" 
+            className="h-24 flex flex-col items-center justify-center gap-2 bg-white hover:bg-primary/5 border-primary/20"
+            onClick={() => navigate("/appointments")}
           >
-            <AlertCircle className="h-6 w-6" />
-            <span>SOS</span>
+            <Calendar className="h-6 w-6 text-[#407CE2]" />
+            <span className="text-sm font-medium text-[#407CE2]">Manage Appointments</span>
           </Button>
         </div>
       </section>

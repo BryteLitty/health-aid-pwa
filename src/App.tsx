@@ -1,37 +1,25 @@
-// import { useState } from 'react'
-// import reactLogo from './assets/react.svg'
-// import appLogo from '/favicon.svg'
-// import PWABadge from './PWABadge.tsx'
-// import './App.css'
+import { useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 
-// function App() {
-//   const [count, setCount] = useState(0)
+const App = () => {
+  const navigate = useNavigate()
+  const { user } = useAuth()
 
-//   return (
-//     <>
-//       <div>
-//         <a href="https://vite.dev" target="_blank">
-//           <img src={appLogo} className="logo" alt="health-aid-pwa logo" />
-//         </a>
-//         <a href="https://react.dev" target="_blank">
-//           <img src={reactLogo} className="logo react" alt="React logo" />
-//         </a>
-//       </div>
-//       <h1>health-aid-pwa</h1>
-//       <div className="card">
-//         <button onClick={() => setCount((count) => count + 1)}>
-//           count is {count}
-//         </button>
-//         <p>
-//           Edit <code>src/App.tsx</code> and save to test HMR
-//         </p>
-//       </div>
-//       <p className="read-the-docs">
-//         Click on the Vite and React logos to learn more
-//       </p>
-//       <PWABadge />
-//     </>
-//   )
-// }
+  useEffect(() => {
+    // Redirect to dashboard if user is logged in, otherwise to login
+    if (user) {
+      navigate('/dashboard')
+    } else {
+      navigate('/login')
+    }
+  }, [user, navigate])
 
-// export default App
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-pulse">Loading...</div>
+    </div>
+  )
+}
+
+export default App

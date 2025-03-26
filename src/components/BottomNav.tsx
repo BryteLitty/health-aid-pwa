@@ -8,7 +8,7 @@ export default function BottomNav() {
     { icon: Home, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Schedule", path: "/schedule" },
     { icon: Activity, label: "Health", path: "/health" },
-    { icon: User, label: "Profile", path: "/profile" },
+    { icon: User, label: "Profile", path: "/account" },
   ]
 
   return (

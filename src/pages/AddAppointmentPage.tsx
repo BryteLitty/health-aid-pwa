@@ -1,10 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import * as z from "zod"
+import { useState, useEffect } from "react"
+import { useNavigate, useParams } from "react-router-dom"
 import { Clock, CalendarIcon, ArrowLeft, User, Info, Stethoscope, FileText, Building, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,8 +10,6 @@ import { useAuth } from "@/context/AuthContext"
 import supabase from "@/supabase/supabase"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
@@ -30,60 +25,102 @@ const appointmentTypes = [
   "Other",
 ]
 
-const appointmentSchema = z.object({
-  doctorName: z.string().min(1, "Doctor's name is required"),
-  type: z.string().min(1, "Appointment type is required"),
-  purpose: z.string().min(1, "Purpose is required"),
-  date: z.string().min(1, "Date is required"),
-  time: z.string().min(1, "Time is required"),
-  notes: z.string().optional(),
-})
-
-type FormData = z.infer<typeof appointmentSchema>
-
 export default function AddAppointmentPage() {
   const [isLoading, setIsLoading] = useState(false)
-  const [selectedDate, setSelectedDate] = useState<Date>()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const [selectedType, setSelectedType] = useState<string>("")
+  const { id } = useParams<{ id?: string }>()
+  const isEditMode = Boolean(id)
+  
+  // Function to format date for input field
+  const formatDateForInput = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    setValue,
-    // watch,
-  } = useForm<FormData>({
-    resolver: zodResolver(appointmentSchema),
-  })
-
-  const onSubmit = async (data: FormData) => {
-    if (!user) return
-
-    setIsLoading(true)
-    try {
-      const { error } = await supabase.from("appointments").insert({
-        user_id: user.id,
-        doctor_name: data.doctorName,
-        type: data.type,
-        purpose: data.purpose,
-        date: data.date,
-        time: data.time,
-        notes: data.notes,
-        status: "scheduled",
-      })
-
-      if (error) throw error
-
-      toast.success("Appointment booked successfully!")
-      navigate("/dashboard")
-    } catch (error) {
-      toast.error("Failed to book appointment")
-      console.error(error)
-    } finally {
-      setIsLoading(false)
+  // Initialize today's date
+  const today = new Date();
+  const todayFormatted = formatDateForInput(today);
+  
+  // Form state
+  const [formState, setFormState] = useState({
+    doctorName: "",
+    type: "",
+    purpose: "",
+    date: todayFormatted, // Set default to today
+    time: "",
+    notes: ""
+  });
+  
+  // Error state - only show after form submission attempt
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [formSubmitted, setFormSubmitted] = useState(false)
+  
+  // Fetch appointment data if in edit mode
+  useEffect(() => {
+    if (isEditMode && id) {
+      const fetchAppointment = async () => {
+        try {
+          setIsLoading(true);
+          const { data, error } = await supabase
+            .from("appointments")
+            .select("*")
+            .eq("id", id)
+            .single();
+          
+          if (error) throw error;
+          
+          if (data) {
+            setFormState({
+              doctorName: data.doctor_name,
+              type: data.type,
+              purpose: data.purpose,
+              date: data.date,
+              time: data.time,
+              notes: data.notes || ""
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching appointment:", error);
+          toast.error("Failed to load appointment details");
+          navigate("/appointments");
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      fetchAppointment();
     }
+  }, [id, isEditMode, navigate]);
+  
+  // Update form state
+  const updateForm = (field: string, value: string) => {
+    setFormState(prev => ({ ...prev, [field]: value }))
+    
+    // Clear error for this field if it exists and user is typing
+    if (errors[field]) {
+      setErrors(prev => {
+        const newErrors = { ...prev }
+        delete newErrors[field]
+        return newErrors
+      })
+    }
+  }
+  
+  // Validate form and return true if valid
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+    
+    if (!formState.doctorName.trim()) newErrors.doctorName = "Doctor's name is required"
+    if (!formState.type) newErrors.type = "Appointment type is required"
+    if (!formState.purpose.trim()) newErrors.purpose = "Purpose is required"
+    if (!formState.date) newErrors.date = "Date is required"
+    if (!formState.time) newErrors.time = "Time is required"
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
   }
 
   // Function to get appointment type icon
@@ -106,18 +143,76 @@ export default function AddAppointmentPage() {
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormSubmitted(true)
+    console.log("Form data being submitted:", formState);
+    
+    // Validate form
+    const isValid = validateForm()
+    if (!isValid) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+    
+    if (!user) {
+      toast.error("Please log in to book an appointment")
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const appointmentData = {
+        user_id: user.id,
+        doctor_name: formState.doctorName,
+        type: formState.type,
+        purpose: formState.purpose,
+        date: formState.date,
+        time: formState.time,
+        notes: formState.notes || "",
+        status: isEditMode ? undefined : "scheduled", // Only set status for new appointments
+      };
+
+      if (isEditMode) {
+        // Update existing appointment
+        const { error } = await supabase
+          .from("appointments")
+          .update(appointmentData)
+          .eq("id", id);
+
+        if (error) throw error;
+        toast.success("Appointment updated successfully!");
+      } else {
+        // Create new appointment
+        const { error } = await supabase
+          .from("appointments")
+          .insert(appointmentData);
+
+        if (error) throw error;
+        toast.success("Appointment booked successfully!");
+      }
+
+      navigate("/appointments");
+    } catch (error) {
+      toast.error(isEditMode ? "Failed to update appointment" : "Failed to book appointment");
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <div className="container max-w-xl mx-auto px-4 py-2 space-y-4">
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate("/dashboard")}
+          onClick={() => navigate(isEditMode ? "/appointments" : "/dashboard")}
           className="text-primary hover:text-primary/80"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <h1 className="text-2xl font-bold">Book Appointment</h1>
+        <h1 className="text-2xl font-bold">{isEditMode ? "Edit Appointment" : "Book Appointment"}</h1>
       </div>
 
       <Card className="p-0 pb-4">
@@ -126,10 +221,14 @@ export default function AddAppointmentPage() {
             <CalendarIcon className="h-5 w-5 text-primary" />
             <span>Appointment Details</span>
           </CardTitle>
-          <CardDescription>Schedule your appointment with healthcare professionals</CardDescription>
+          <CardDescription>
+            {isEditMode 
+              ? "Update your appointment details below"
+              : "Schedule your appointment with healthcare professionals"}
+          </CardDescription>
         </CardHeader>
         <CardContent className="pt-4">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="doctorName" className="flex items-center gap-1">
@@ -148,29 +247,31 @@ export default function AddAppointmentPage() {
                 </Label>
                 <Input
                   id="doctorName"
-                  {...register("doctorName")}
+                  value={formState.doctorName}
+                  onChange={(e) => updateForm("doctorName", e.target.value)}
                   placeholder="Dr. Jane Smith"
-                  className="border-input focus-visible:ring-primary h-12"
+                  className={`border-input focus-visible:ring-primary h-12 ${formSubmitted && errors.doctorName ? "border-destructive" : ""}`}
                 />
-                {errors.doctorName && (
-                  <p className="text-xs font-medium text-destructive">{errors.doctorName.message}</p>
+                {formSubmitted && errors.doctorName && (
+                  <p className="text-xs font-medium text-destructive">{errors.doctorName}</p>
                 )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="type" className="flex items-center gap-1">
                   <div className="text-primary">
-                    {selectedType ? getAppointmentTypeIcon(selectedType) : <Stethoscope className="h-4 w-4" />}
+                    {formState.type ? getAppointmentTypeIcon(formState.type) : <Stethoscope className="h-4 w-4" />}
                   </div>
                   Appointment Type
                 </Label>
                 <Select
-                  onValueChange={(value) => {
-                    setValue("type", value)
-                    setSelectedType(value)
-                  }}
+                  value={formState.type}
+                  onValueChange={(value) => updateForm("type", value)}
                 >
-                  <SelectTrigger id="type" className="border-input focus-visible:ring-primary h-12 py-5">
+                  <SelectTrigger 
+                    id="type" 
+                    className={`border-input focus-visible:ring-primary h-12 py-5 ${formSubmitted && errors.type ? "border-destructive" : ""}`}
+                  >
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -181,7 +282,9 @@ export default function AddAppointmentPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.type && <p className="text-xs font-medium text-destructive">{errors.type.message}</p>}
+                {formSubmitted && errors.type && (
+                  <p className="text-xs font-medium text-destructive">{errors.type}</p>
+                )}
               </div>
             </div>
 
@@ -202,11 +305,14 @@ export default function AddAppointmentPage() {
               </Label>
               <Input
                 id="purpose"
-                {...register("purpose")}
+                value={formState.purpose}
+                onChange={(e) => updateForm("purpose", e.target.value)}
                 placeholder="Brief description of the visit"
-                className="border-input focus-visible:ring-primary h-12"
+                className={`border-input focus-visible:ring-primary h-12 ${formSubmitted && errors.purpose ? "border-destructive" : ""}`}
               />
-              {errors.purpose && <p className="text-xs font-medium text-destructive">{errors.purpose.message}</p>}
+              {formSubmitted && errors.purpose && (
+                <p className="text-xs font-medium text-destructive">{errors.purpose}</p>
+              )}
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -215,35 +321,22 @@ export default function AddAppointmentPage() {
                   <CalendarIcon className="h-4 w-4 text-primary" />
                   Date
                 </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="date"
-                      variant="outline"
-                      className={`w-full h-12 justify-start text-left font-normal border-input focus-visible:ring-primary ${
-                        !selectedDate && "text-muted-foreground"
-                      }`}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={(date) => {
-                        setSelectedDate(date)
-                        if (date) {
-                          setValue("date", format(date, "yyyy-MM-dd"))
-                        }
-                      }}
-                      initialFocus
-                      className="rounded-md border"
-                    />
-                  </PopoverContent>
-                </Popover>
-                {errors.date && <p className="text-xs font-medium text-destructive">{errors.date.message}</p>}
+                <div className="relative">
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formState.date}
+                    onChange={(e) => updateForm("date", e.target.value)}
+                    min={todayFormatted} // Prevent selecting past dates
+                    className={`border-input focus-visible:ring-primary h-12 pl-10 ${
+                      formSubmitted && errors.date ? "border-destructive" : ""
+                    }`}
+                  />
+                  <CalendarIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+                {formSubmitted && errors.date && (
+                  <p className="text-xs font-medium text-destructive">{errors.date}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -254,13 +347,16 @@ export default function AddAppointmentPage() {
                 <div className="relative">
                   <Input
                     id="time"
-                    {...register("time")}
                     type="time"
-                    className="border-input focus-visible:ring-primary pl-10 h-12"
+                    value={formState.time}
+                    onChange={(e) => updateForm("time", e.target.value)}
+                    className={`border-input focus-visible:ring-primary pl-10 h-12 ${formSubmitted && errors.time ? "border-destructive" : ""}`}
                   />
                   <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 </div>
-                {errors.time && <p className="text-xs font-medium text-destructive">{errors.time.message}</p>}
+                {formSubmitted && errors.time && (
+                  <p className="text-xs font-medium text-destructive">{errors.time}</p>
+                )}
               </div>
             </div>
 
@@ -283,29 +379,29 @@ export default function AddAppointmentPage() {
               </Label>
               <Textarea
                 id="notes"
-                {...register("notes")}
+                value={formState.notes}
+                onChange={(e) => updateForm("notes", e.target.value)}
                 placeholder="Any additional information or special requirements..."
                 className="border-input focus-visible:ring-primary min-h-[120px]"
               />
             </div>
 
-            <div className="pt-4">
+            <div className="flex justify-end gap-2">
               <Button
-                type="submit"
-                className="w-full h-14 rounded-full bg-primary hover:bg-primary/90 text-white text-lg font-medium flex items-center justify-center gap-2"
+                type="button"
+                variant="outline"
+                onClick={() => navigate(isEditMode ? "/appointments" : "/dashboard")}
                 disabled={isLoading}
               >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isLoading}>
                 {isLoading ? (
-                  <>
-                    <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span>
-                    <span>Booking...</span>
-                  </>
-                ) : (
-                  <>
-                    <CalendarIcon className="h-5 w-5" />
-                    <span>Book Appointment</span>
-                  </>
-                )}
+                  <span className="flex items-center gap-1">
+                    <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                    {isEditMode ? "Updating..." : "Booking..."}
+                  </span>
+                ) : isEditMode ? "Update Appointment" : "Book Appointment"}
               </Button>
             </div>
           </form>
